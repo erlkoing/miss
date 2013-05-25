@@ -45,9 +45,11 @@ public class Main {
 		// Start the chat componentname
 		CreationInfo ci = new CreationInfo();
 		Map<String, Object> infoArgs = new HashMap<String, Object>();
-		infoArgs.put("max_child_workers", new Integer(10));
-		infoArgs.put("initial_workers_count", new Integer(8));
-		infoArgs.put("steps_count", new Integer(1));
+		infoArgs.put("maxChildrenAgents", new Integer(5000));
+		infoArgs.put("initialChildrenAgents", new Integer(100));
+		infoArgs.put("maxSteps", new Integer(4));
+		infoArgs.put("action", new RandomNumberAction());
+		infoArgs.put("verbose", new Boolean(true));
 		ci.setArguments(infoArgs);
 		
 		IComponentIdentifier cid	= cms.createComponent("WorkspaceAgent", WorkspaceAgent.class.getName()+".class", ci, null).get(sus);

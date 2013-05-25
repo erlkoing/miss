@@ -1,14 +1,14 @@
 package pl.edu.agh.miss;
 
-import java.util.ArrayList;
-
-import jadex.bridge.IComponentIdentifier;
-import jadex.bridge.service.search.SServiceProvider;
+import jadex.bridge.IComponentStep;
+import jadex.bridge.IInternalAccess;
 import jadex.bridge.service.types.clock.IClockService;
-import jadex.commons.future.DefaultResultListener;
+import jadex.commons.future.Future;
 import jadex.commons.future.IFuture;
 import jadex.micro.MicroAgent;
+import jadex.micro.annotation.AgentArgument;
 import jadex.micro.annotation.AgentBody;
+import jadex.micro.annotation.AgentCreated;
 import jadex.micro.annotation.AgentService;
 import jadex.micro.annotation.Argument;
 import jadex.micro.annotation.Arguments;
@@ -25,76 +25,65 @@ import jadex.micro.annotation.RequiredServices;
 })
 @ProvidedServices(@ProvidedService(type=ICustomAgentService.class, implementation=@Implementation(CustomAgentService.class)))
 @Arguments({
-	@Argument(name="initial_state", description= "Argument okresla poczatkowy stan agenta", clazz=Double.class, defaultvalue="10.0"),
-	@Argument(name="verbose", description= "", clazz=Boolean.class, defaultvalue="true")
+	@Argument(name="state", description= "Argument okresla poczatkowy stan agenta", clazz=Double.class, defaultvalue="10.0"),
+	@Argument(name="verbose", description= "", clazz=Boolean.class, defaultvalue="true"),
+	@Argument(name="blocked", description= "", clazz=Boolean.class, defaultvalue="false")
 })
-//@Agent
+
 public class CustomAgent extends MicroAgent {
+	
+	@AgentArgument
 	Boolean verbose;
+	
+	@AgentArgument
 	Double state;
+	
+	@AgentArgument
+	Boolean blocked;
+	
+	public Double getState() {
+		return state;
+	}
+	
+	public void setState(Double state) {
+		this.state = state;
+	}
 	
 	@AgentService
 	protected IClockService clockservice;
 	
-	private void setUpArguments() {
-		state = (Double)getArgument("initial_state");
-		verbose = (Boolean)getArgument("verbose");
-	}
-
-	@Override
+	@AgentService
+	protected IWorkplaceAgentService workplaceservice;
+	
+	@AgentCreated
 	public IFuture<Void> agentCreated() {
-		setUpArguments();
-		indroduceYourself();
-		
+//		System.out.println(getAgentName() + " with initial state " + state);
+		System.out.println(getAgentName() + " z poczatkowym stanem " + state);
 		return IFuture.DONE;
 	}
 	
-	private void indroduceYourself() {
-		if (verbose) {
-			System.out.println("CUSTOMAGENT - Hello I'm " + getAgentName());
-		}
-	}
-
 	@AgentBody
 	public IFuture<Void> executeBody() {
-		//System.out.println("Jestem CustomAgent " + getAgentName());
-		//System.out.println("CustomAgent: czas pobrany z clockservice =  " + new Date(clockservice.getTime()));
-		//System.out.println("CustomAgent: moje id = " + getServiceContainer().getId().getLocalName());
-//		IFuture<IServiceProvider> fut = getServiceContainer().getParent();
-//		fut.addResultListener(new DefaultResultListener<IServiceProvider>() {
-//
-//			@Override
-//			public void resultAvailable(IServiceProvider arg0) {
-//				System.out.println("CustomAgent: moim parentem jest = " + arg0.getId().getName());						
-//			}
-//		});
-//		Future<Void> ret = new Future<>();
-		
-		return IFuture.DONE;
+		return new Future<Void>();
 	}
+	
+	public void signMeForMergeList() {
+		System.out.println(getAgentName() + "Zapisalem sie na liste agentow chcacych sie polaczyc");
+		workplaceservice.signUpForMerge(getComponentIdentifier());
+		blocked = true;
+	}
+	
+	public void indroduceYourself() {
+		scheduleStep(new IComponentStep<Void>() {
 
-	public void runWorkplaceService() {
-		IFuture<IWorkplaceAgentService> f = SServiceProvider.getService(getServiceProvider(), getComponentIdentifier().getParent(), IWorkplaceAgentService.class);
-		f.addResultListener(new DefaultResultListener<IWorkplaceAgentService>() {
-			public void resultAvailable(IWorkplaceAgentService agentService) {
+			@Override
+			public IFuture<Void> execute(IInternalAccess ia) {
+				if (verbose) {
+					System.out.println(getAgentName() + " - Hello I'm " + getAgentName());
+				}
 				
-				IFuture<Integer> fut = agentService.getWorkplaceStatus();
-				
-				
-				fut.addResultListener(new DefaultResultListener<Integer>() {
-
-					@Override
-					public void resultAvailable(Integer arg0) {
-						
-						System.out.println("Workplace state = " + arg0);						
-					}
-				});
-				
-				
+				return IFuture.DONE;
 			}
-
-
-		});
-		
+		}).get();
 	}
 }

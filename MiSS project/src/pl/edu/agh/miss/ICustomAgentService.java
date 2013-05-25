@@ -1,7 +1,11 @@
 package pl.edu.agh.miss;
 
-import jadex.commons.future.IFuture;
+import jadex.commons.future.Future;
+
 
 public interface ICustomAgentService {
-	public IFuture<Double> getState();
+	
+	public Future<Void> doSSomething(final IAction action);
+	
+	public double getState();
 }

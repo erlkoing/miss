@@ -1,9 +1,15 @@
 package pl.edu.agh.miss;
 
-import jadex.commons.future.IFuture;
+import jadex.bridge.IComponentIdentifier;
 
 
 public interface IWorkplaceAgentService {
-	public IFuture<Integer> getWorkplaceStatus();
+	public void deleteMe(IComponentIdentifier me);
 	
+	public IComponentIdentifier getSomeSibling(IComponentIdentifier me);
+	
+	public void signUpForMerge(IComponentIdentifier me);
+
+	public void killMe(IComponentIdentifier me);
 }
+
