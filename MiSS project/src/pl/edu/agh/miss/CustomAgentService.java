@@ -25,7 +25,7 @@ public class CustomAgentService implements ICustomAgentService {
 
 	
 	@Override
-	public Future<Void> doSSomething(final IAction action) {
+	public Future<Void> doSomething(final IAction action) {
 		agent.scheduleStep(new IComponentStep<Void>() {
 
 			@Override

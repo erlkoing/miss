@@ -32,6 +32,7 @@ import jadex.micro.annotation.RequiredServices;
 
 public class CustomAgent extends MicroAgent {
 	
+	// argumenty ktorym zostana wstrzykniete odpowiednie wartosci 
 	@AgentArgument
 	Boolean verbose;
 	
@@ -41,24 +42,28 @@ public class CustomAgent extends MicroAgent {
 	@AgentArgument
 	Boolean blocked;
 	
-	public Double getState() {
-		return state;
-	}
-	
-	public void setState(Double state) {
-		this.state = state;
-	}
-	
+	// przykladowy serwis - mozna usunac w przyszlosci
 	@AgentService
 	protected IClockService clockservice;
 	
+	// serwis workplace-u zeby nie trzeba bylo go za kazdym razem szukac itd.
 	@AgentService
 	protected IWorkplaceAgentService workplaceservice;
 	
+	// funkcja wywolywana zaraz po stworzeniu agenta
 	@AgentCreated
 	public IFuture<Void> agentCreated() {
-//		System.out.println(getAgentName() + " with initial state " + state);
-		System.out.println(getAgentName() + " z poczatkowym stanem " + state);
+		scheduleStep(new IComponentStep<Void>() {
+
+			@Override
+			public IFuture<Void> execute(IInternalAccess ia) {
+				if (verbose) {
+					indroduceYourself();
+				}
+				
+				return IFuture.DONE;
+			}
+		}).get();
 		return IFuture.DONE;
 	}
 	
@@ -67,12 +72,14 @@ public class CustomAgent extends MicroAgent {
 		return new Future<Void>();
 	}
 	
+	// zapisanie agenta na liste w celu polaczenia z innym agentem + blokada agenta
 	public void signMeForMergeList() {
 		System.out.println(getAgentName() + "Zapisalem sie na liste agentow chcacych sie polaczyc");
 		workplaceservice.signUpForMerge(getComponentIdentifier());
 		blocked = true;
 	}
 	
+	// jakas taka prosta funkcja 
 	public void indroduceYourself() {
 		scheduleStep(new IComponentStep<Void>() {
 
@@ -85,5 +92,15 @@ public class CustomAgent extends MicroAgent {
 				return IFuture.DONE;
 			}
 		}).get();
+	}
+	
+	// pobranie stanu
+	public Double getState() {
+		return state;
+	}
+	
+	// ustawienie stanu
+	public void setState(Double state) {
+		this.state = state;
 	}
 }

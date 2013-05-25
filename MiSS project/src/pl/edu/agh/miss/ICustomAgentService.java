@@ -5,7 +5,9 @@ import jadex.commons.future.Future;
 
 public interface ICustomAgentService {
 	
-	public Future<Void> doSSomething(final IAction action);
+	// serwis wywoluje akcje przeslana jako parametr
+	public Future<Void> doSomething(final IAction action);
 	
+	// serwis zwraca stan agenta
 	public double getState();
 }

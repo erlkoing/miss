@@ -78,6 +78,7 @@ public class WorkspaceAgent extends MicroAgent {
 	ArrayList<IComponentIdentifier> mergeList = new ArrayList<IComponentIdentifier>();	// lista 
 	
 	
+	
 	@AgentService
 	protected IComponentManagementService cms;	
 	
@@ -105,6 +106,7 @@ public class WorkspaceAgent extends MicroAgent {
 	
 	
 	// Private methods
+	// prosta funkcja ktora sie przedstawia
 	private void indroduceYourself() {
 		scheduleStep(new IComponentStep<Void>() {
 
@@ -173,6 +175,7 @@ public class WorkspaceAgent extends MicroAgent {
 		}).get();
 	}
 	
+	// funkcja wypisujaca child agentow
 	private void printChildrenAgents() {
 		scheduleStep(new IComponentStep<Void>() {
 
@@ -194,20 +197,7 @@ public class WorkspaceAgent extends MicroAgent {
 		}).get();
 	}
 	
-	private void printChildrenAgents2() {
-
-				if (verbose) {
-					//System.out.println("WORKPLACES CHILDREN AGENTS");
-					System.out.println(getAgentName() + " - moi agenci " + childrenAgents.size());	
-				}
-				
-				if (childrenAgents != null) {
-					for (IComponentIdentifier ci : childrenAgents) {
-						System.out.println(ci.getName());
-					}
-				}
-	}
-	
+	// uaktualnia zbior agentow
 	private void updateChildrenSet() {
 		scheduleStep(new IComponentStep<Void>() {
 
@@ -220,6 +210,7 @@ public class WorkspaceAgent extends MicroAgent {
 		}).get();
 	}
 	
+	// wyciaga child agentow z funkji jadexowych
 	private HashSet<IComponentIdentifier> getChildrenAgents() {
 		final HashSet<IComponentIdentifier> result = new HashSet<IComponentIdentifier>();
 		scheduleStep(new IComponentStep<Void>() {
@@ -236,33 +227,8 @@ public class WorkspaceAgent extends MicroAgent {
 
 		return result;
 	}
-
 	
-	public IFuture<Void> synchronusSynchronusSteps() {
-		scheduleStep(new IComponentStep<Void>() {
-			@Override
-			public IFuture<Void> execute(IInternalAccess ia) {
-				for (actualStep = 0; actualStep < maxChildrenAgents; actualStep++) {
-					if (verbose) {
-						//System.out.println("Step " + actualStep);
-						System.out.println("Krok " + actualStep);
-					}
-					
-					for(final IComponentIdentifier cid:  childrenAgents) {
-						SServiceProvider.getService(getServiceProvider(), cid, ICustomAgentService.class).get().doSSomething(action);
-					}
-					
-					//printAgentsOnMergeList();
-					//manageMergeList();
-		
-					waitForDelay(1000).get();
-				}
-				return IFuture.DONE;
-			}
-		}).get();
-		return IFuture.DONE;
-	}
-	
+	// glowna petla agenta - jej zadaniem jest iteracja po kolejnych krokach 
 	@AgentBody
 	public IFuture<Void> executeBody() {
 		scheduleStep(new IComponentStep<Void>() {
@@ -281,9 +247,9 @@ public class WorkspaceAgent extends MicroAgent {
 			}
 		}).get();
 		return IFuture.DONE;
-		//return synchronusSynchronusSteps();
 	}
 	
+	// funkcja iterujaca po child agentach 
 	private void performStepOnAllAgents() {
 		scheduleStep(new IComponentStep<Void>() {
 
@@ -297,13 +263,14 @@ public class WorkspaceAgent extends MicroAgent {
 		}).get();
 	}
 	
+	// funkcja wywolujaca odpowiedni serwis na wskazanym child agencie
 	private void performStepOnSingleAgent(final IComponentIdentifier cid) {
 		scheduleStep(new IComponentStep<Void>() {
 
 			@Override
 			public IFuture<Void> execute(IInternalAccess ia) {
 				System.out.println("\n" + cid.getLocalName());
-				SServiceProvider.getService(getServiceProvider(), cid, ICustomAgentService.class).get().doSSomething(action).get();
+				SServiceProvider.getService(getServiceProvider(), cid, ICustomAgentService.class).get().doSomething(action).get();
 				return IFuture.DONE;
 			}
 		}).get();
