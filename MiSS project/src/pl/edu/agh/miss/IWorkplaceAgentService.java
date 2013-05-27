@@ -11,5 +11,6 @@ public interface IWorkplaceAgentService {
 	public void signUpForMerge(IComponentIdentifier me);
 
 	public void killMe(IComponentIdentifier me);
+	
+	public void signUpForCompare(IComponentIdentifier agent1, IComponentIdentifier agent2);
 }
-

@@ -47,7 +47,7 @@ public class Main {
 		Map<String, Object> infoArgs = new HashMap<String, Object>();
 		infoArgs.put("maxChildrenAgents", new Integer(5000));
 		infoArgs.put("initialChildrenAgents", new Integer(100));
-		infoArgs.put("maxSteps", new Integer(4));
+		infoArgs.put("maxSteps", new Integer(40));
 		infoArgs.put("action", new RandomNumberAction());
 		infoArgs.put("verbose", new Boolean(true));
 		ci.setArguments(infoArgs);

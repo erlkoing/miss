@@ -21,14 +21,12 @@ public class WorkspaceAgentService implements IWorkplaceAgentService {
 
 	@Override
 	public IComponentIdentifier getSomeSibling(IComponentIdentifier me) {
-		Random r = new Random((new Date()).getTime());
-		
-		Iterator<IComponentIdentifier> itr = agent.childrenAgents.iterator();
-		for (int i = 0; i < r.nextInt(agent.childrenAgents.size()); i++) {
-			itr.next();
+		IComponentIdentifier result;
+		while ( (result = agent.getSomeChildAgent()).getLocalName().equals(me.getLocalName())) {
+			
 		}
 
-		return itr.next();
+		return result;
 	}
 
 	@Override
@@ -39,6 +37,13 @@ public class WorkspaceAgentService implements IWorkplaceAgentService {
 	@Override
 	public void killMe(IComponentIdentifier me) {
 		agent.deleteChildAgent(me);
+	}
+
+	@Override
+	public void signUpForCompare(IComponentIdentifier agent1,
+			IComponentIdentifier agent2) {
+		System.out.println("zapisuje agentow " + agent1.getName() + " i " + agent2.getName());
+		agent.addToCompareList(agent1, agent2);
 	}
 	
 	

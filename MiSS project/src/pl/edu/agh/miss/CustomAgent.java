@@ -1,5 +1,6 @@
 package pl.edu.agh.miss;
 
+import jadex.bridge.IComponentIdentifier;
 import jadex.bridge.IComponentStep;
 import jadex.bridge.IInternalAccess;
 import jadex.bridge.service.types.clock.IClockService;
@@ -19,6 +20,8 @@ import jadex.micro.annotation.ProvidedServices;
 import jadex.micro.annotation.RequiredService;
 import jadex.micro.annotation.RequiredServices;
 
+import java.util.HashSet;
+
 @RequiredServices({
 	@RequiredService(name = "clockservice", type = IClockService.class, binding = @Binding(scope = Binding.SCOPE_PLATFORM)),
 	@RequiredService(name = "workplaceservice", type = IWorkplaceAgentService.class, binding = @Binding(scope = Binding.SCOPE_PLATFORM))
@@ -27,6 +30,7 @@ import jadex.micro.annotation.RequiredServices;
 @Arguments({
 	@Argument(name="state", description= "Argument okresla poczatkowy stan agenta", clazz=Double.class, defaultvalue="10.0"),
 	@Argument(name="verbose", description= "", clazz=Boolean.class, defaultvalue="true"),
+	@Argument(name="id", description= "", clazz=Integer.class),
 	@Argument(name="blocked", description= "", clazz=Boolean.class, defaultvalue="false")
 })
 
@@ -42,18 +46,20 @@ public class CustomAgent extends MicroAgent {
 	@AgentArgument
 	Boolean blocked;
 	
-	// przykladowy serwis - mozna usunac w przyszlosci
-	@AgentService
-	protected IClockService clockservice;
+	@AgentArgument
+	Integer id;
 	
 	// serwis workplace-u zeby nie trzeba bylo go za kazdym razem szukac itd.
 	@AgentService
 	protected IWorkplaceAgentService workplaceservice;
 	
-	// funkcja wywolywana zaraz po stworzeniu agenta
+	// zbior zawierajacy znane "rodzenstwo" uzyskane dzieki odpytaniu workplace-a
+	HashSet<IComponentIdentifier> knownSiblings = new HashSet<IComponentIdentifier>();
+	
+	// funkcja wywolywana zaraz po stworzeniu agenta - glowne zadanie to sie przedstawic + moze ustawic jakies zmienne
 	@AgentCreated
 	public IFuture<Void> agentCreated() {
-		scheduleStep(new IComponentStep<Void>() {
+		return new Future<Void>(scheduleStep(new IComponentStep<Void>() {
 
 			@Override
 			public IFuture<Void> execute(IInternalAccess ia) {
@@ -63,8 +69,7 @@ public class CustomAgent extends MicroAgent {
 				
 				return IFuture.DONE;
 			}
-		}).get();
-		return IFuture.DONE;
+		}).get());
 	}
 	
 	@AgentBody
@@ -102,5 +107,9 @@ public class CustomAgent extends MicroAgent {
 	// ustawienie stanu
 	public void setState(Double state) {
 		this.state = state;
+	}
+		
+	public void modifyStateBy(Double chunk) {
+		setState(getState() + chunk);
 	}
 }

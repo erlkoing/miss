@@ -29,9 +29,13 @@ import jadex.micro.annotation.RequiredService;
 import jadex.micro.annotation.RequiredServices;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.Random;
 
 @RequiredServices({
 	@RequiredService(name="cms", type=IComponentManagementService.class, binding=@Binding(scope=Binding.SCOPE_PLATFORM)),
@@ -43,6 +47,7 @@ import java.util.Map;
 	@Argument(name="maxChildrenAgents", description= "Parametr okresla maksymalna liczbe workerow w workspace", clazz=Integer.class, defaultvalue="100"),
 	@Argument(name="initialChildrenAgents", description= "Parametr okresla pocatkowa liczbe workerow", clazz=Integer.class, defaultvalue="100"),
 	@Argument(name="maxSteps", description= "Parametr okresla liczbe krokow - 0 = neiskonczona", clazz=Integer.class, defaultvalue="2"),
+	@Argument(name="compareParameter", description= "Parametr okresla liczbe krokow - 0 = neiskonczona", clazz=Double.class, defaultvalue="0.2"),
 	@Argument(name="verbose", description= "", clazz=Boolean.class, defaultvalue="true"),
 	@Argument(name="action", clazz=IAction.class)
 })
@@ -66,6 +71,9 @@ public class WorkspaceAgent extends MicroAgent {
 	Integer maxSteps;	// (maksymalna) liczba krokow
 	
 	@AgentArgument
+	Double compareParameter;	// parametr wykorzysywany przy porownywaniu stanow agentow w celu ustalenia jaki procent roznicy ma zostac ododany/ odjety od agentow
+	
+	@AgentArgument
 	IAction action;		// akcja/e
 	
 	// pozostale - potrzebne do funkcjownowania klasy
@@ -77,15 +85,14 @@ public class WorkspaceAgent extends MicroAgent {
 	
 	ArrayList<IComponentIdentifier> mergeList = new ArrayList<IComponentIdentifier>();	// lista 
 	
-	
-	
+	ArrayList<ArrayList<IComponentIdentifier>> compareList = new ArrayList<ArrayList<IComponentIdentifier>>();
+
 	@AgentService
 	protected IComponentManagementService cms;	
 	
 	@AgentService
 	protected IClockService clockservice;
-		
-	
+			
 	// Public methods
 	@AgentCreated
 	public IFuture<Void> agentCreated() {
@@ -102,10 +109,10 @@ public class WorkspaceAgent extends MicroAgent {
 		
 		return IFuture.DONE;
 	}
-
 	
-	
-	// Private methods
+	/***********************************************************************************************
+	 ************************************* WORKPLACE FUNCTIONS ************************************* 
+	 ***********************************************************************************************/
 	// prosta funkcja ktora sie przedstawia
 	private void indroduceYourself() {
 		scheduleStep(new IComponentStep<Void>() {
@@ -140,94 +147,6 @@ public class WorkspaceAgent extends MicroAgent {
 		}).get();
 	}
 	
-	// Funkcja tworzy agenta
-	private void createChildAgent(final double initialState) {
-		scheduleStep(new IComponentStep<Void>() {
-			
-			@Override
-			public IFuture<Void> execute(IInternalAccess ia) {
-				// Wypisanie informacji na konsole o akcji
-				if (verbose) {
-					//System.out.println("WORKPLACEAGENT - Creating Agent: " + getAgentName() + "#CHILD" + lastPeerIndex);	
-					System.out.println(getAgentName() + " - Tworze agenta: " + getAgentName() + "#CHILD" + lastPeerIndex);
-				}
-				
-				// Stworzenie informacji przekazywanej nowemu agentowi tj. kim jest jego parent, ustawienie parametrow		
-				CreationInfo crInfo = new CreationInfo(getComponentIdentifier());
-				Map<String, Object> infoArgs = new HashMap<String, Object>();
-				infoArgs.put("verbose", verbose);
-				infoArgs.put("state", new Double(initialState));
-				crInfo.setArguments(infoArgs);
-				
-				// Właściwe stworzenie agenta
-				childrenAgents.add(cms.createComponent(getAgentName() + "#CHILD" + lastPeerIndex, CustomAgent.class.getName()+".class", crInfo, null).get());
-				
-				// uaktualniamy wlasny zbior child agentow
-				updateChildrenSet();
-				
-				// Aktualizacja odpowiednich zmiennych
-				lastPeerIndex++;
-				actualChildrenCount++;
-			
-				// Powrót
-				return IFuture.DONE;
-			}
-		}).get();
-	}
-	
-	// funkcja wypisujaca child agentow
-	private void printChildrenAgents() {
-		scheduleStep(new IComponentStep<Void>() {
-
-			@Override
-			public IFuture<Void> execute(IInternalAccess ia) {
-
-				if (verbose) {
-					//System.out.println("WORKPLACES CHILDREN AGENTS");
-					System.out.println(getAgentName() + " - moi agenci " + childrenAgents.size());	
-				}
-				
-				if (childrenAgents != null) {
-					for (IComponentIdentifier ci : childrenAgents) {
-						System.out.println(ci.getName());
-					}
-				}
-				return IFuture.DONE;
-			}
-		}).get();
-	}
-	
-	// uaktualnia zbior agentow
-	private void updateChildrenSet() {
-		scheduleStep(new IComponentStep<Void>() {
-
-			@Override
-			public IFuture<Void> execute(IInternalAccess ia) {
-				childrenAgents.clear();	// czyscimy zbior
-				childrenAgents = getChildrenAgents();	// przypisujemy nowa liste
-				return IFuture.DONE;
-			}
-		}).get();
-	}
-	
-	// wyciaga child agentow z funkji jadexowych
-	private HashSet<IComponentIdentifier> getChildrenAgents() {
-		final HashSet<IComponentIdentifier> result = new HashSet<IComponentIdentifier>();
-		scheduleStep(new IComponentStep<Void>() {
-
-			@Override
-			public IFuture<Void> execute(IInternalAccess ia) {
-				
-				for (IServiceProvider sp : getServiceContainer().getChildren().get()) {
-					result.add(sp.getId());
-				}		
-				return IFuture.DONE;
-			}
-		}).get();
-
-		return result;
-	}
-	
 	// glowna petla agenta - jej zadaniem jest iteracja po kolejnych krokach 
 	@AgentBody
 	public IFuture<Void> executeBody() {
@@ -258,11 +177,15 @@ public class WorkspaceAgent extends MicroAgent {
 				for(final IComponentIdentifier cid:  childrenAgents) {
 					performStepOnSingleAgent(cid);
 				}
+				System.out.println();
+				manageComparations();
+				manageMergeList();
+				
 				return IFuture.DONE;
 			}
 		}).get();
 	}
-	
+
 	// funkcja wywolujaca odpowiedni serwis na wskazanym child agencie
 	private void performStepOnSingleAgent(final IComponentIdentifier cid) {
 		scheduleStep(new IComponentStep<Void>() {
@@ -271,51 +194,141 @@ public class WorkspaceAgent extends MicroAgent {
 			public IFuture<Void> execute(IInternalAccess ia) {
 				System.out.println("\n" + cid.getLocalName());
 				SServiceProvider.getService(getServiceProvider(), cid, ICustomAgentService.class).get().doSomething(action).get();
+				printAllAgentsStates();
 				return IFuture.DONE;
 			}
 		}).get();
 	}
-											
+	
+	@AgentKilled
+	public IFuture<Void> agentKilled() {
+		System.out.println(getAgentName() + " killed.");
+		return IFuture.DONE;
+	}
+	
+	
+	/************************************************************************************************
+	 **************************************** COMPARE AGENTS **************************************** 
+	 ************************************************************************************************/
+	// Porownywanie stanow agentow
+	private void compareAgents(IComponentIdentifier agent1, IComponentIdentifier agent2) {
+		System.out.println(getAgentName() + " - comparing " + agent1.getLocalName() + " with " + agent2.getName());
+		
+		ArrayList<IComponentIdentifier> agentsList = new ArrayList<IComponentIdentifier>();
+		agentsList.add(agent1);
+		agentsList.add(agent2);
+		
+		// sprawdzamy czy agenci istnieja 
+		if (checkIfChildAgentsExists(agentsList)) {
+			// pobieramy stany agentow
+			Double agentState1 = SServiceProvider.getService(getServiceProvider(), agent1, ICustomAgentService.class).get().getState().get();
+			Double agentState2 = SServiceProvider.getService(getServiceProvider(), agent2, ICustomAgentService.class).get().getState().get();
+			
+			Double compareResult = (agentState1 - agentState2) * compareParameter;
+			
+			System.out.println(getAgentName() + " - comparing agent " + agent1.getName() + " " + agentState1 + ", with " + agent2.getName() + " " + agentState2 + " - " + compareResult);
+			
+			SServiceProvider.getService(getServiceProvider(), agent1, ICustomAgentService.class).get().modifyStateBy(compareResult).get();
+			SServiceProvider.getService(getServiceProvider(), agent2, ICustomAgentService.class).get().modifyStateBy(-compareResult).get();	// wazny minus!
+		}
+	}
+	
+	public void manageComparations() {
+		System.out.println("ManageComparation");
+		// uaktualniamy zbior naszych child agentow
+		updateChildrenSet();
+		System.out.println("iteracja");
+		System.out.println(compareList.size());
+		for (ArrayList<IComponentIdentifier> agentsToCompare : compareList) {
+			if (agentsToCompare.size() == 2) {
+				compareAgents(agentsToCompare.get(0), agentsToCompare.get(1));
+			} else {
+				System.out.println(getAgentName() + " - invalid array list size with agents to compare.");
+			}
+		}
+		
+		compareList.clear();
+	}
+	
+	
+	public void addToCompareList(final IComponentIdentifier agent1, final IComponentIdentifier agent2) {
+		scheduleStep(new IComponentStep<Void>() {
+
+			@Override
+			public IFuture<Void> execute(IInternalAccess ia) {
+				System.out.println("dodaje agentow do listy w celu porownania");
+				System.out.println(compareList.size());
+				ArrayList<IComponentIdentifier> agentsList = new ArrayList<IComponentIdentifier>();
+				agentsList.add(agent1);
+				agentsList.add(agent2);
+				compareList.add(agentsList);
+				System.out.println(compareList.size());		
+				return IFuture.DONE;
+			}
+		}).get();
+	}
 	
 	
 	
+	/************************************************************************************************
+	 ***************************************** MERGE AGENTS ***************************************** 
+	 ************************************************************************************************/
+	public void manageMergeList() {
+		System.out.println(getAgentName() + " - Zaczynam przegladac liste agentow chetnych do polaczenia ");
+		while (mergeList.size() >= 2) {
+			mergeAgents(mergeList.get(0), mergeList.get(1));
+			mergeList.remove(0);
+			mergeList.remove(0);
+		}
+	}
+	
+	public void mergeAgents(IComponentIdentifier agent1, IComponentIdentifier agent2) {
+		double stateAgent1 = SServiceProvider.getService(getServiceProvider(), agent1, ICustomAgentService.class).get().getState().get();
+		double stateAgent2 = SServiceProvider.getService(getServiceProvider(), agent2, ICustomAgentService.class).get().getState().get();
+		createChildAgent(stateAgent1 + stateAgent2);
+		deleteChildAgent(agent1);
+		deleteChildAgent(agent2);
+	}
+	
+	public void addToMergeList(final IComponentIdentifier cid) {
+		if (!mergeList.contains(cid))
+			mergeList.add(cid);	
+	}
 	
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+	/***********************************************************************************************
+	 *************************************** PRINT FUNCTIONS *************************************** 
+	 ***********************************************************************************************/
+	public void printAllAgentsStates() {
+		scheduleStep(new IComponentStep<Void>() {
+
+			@Override
+			public IFuture<Void> execute(IInternalAccess ia) {
+				for(final IComponentIdentifier cid:  childrenAgents) {
+					System.out.println(cid.getName() + " - " + SServiceProvider.getService(getServiceProvider(), cid, ICustomAgentService.class).get().getState().get());
+				}
+				
+				return IFuture.DONE;
+			}
+		}).get();
+	}
+
+	// funkcja wypisujaca child agentow
+	private void printChildrenAgents() {
+		scheduleStep(new IComponentStep<Void>() {
+
+			@Override
+			public IFuture<Void> execute(IInternalAccess ia) {
+
+				if (verbose) {
+					//System.out.println("WORKPLACES CHILDREN AGENTS");
+					System.out.println(getAgentName() + " - moi agenci " + childrenAgents.size());	
+				}
+				
+				return IFuture.DONE;
+			}
+		}).get();
+	}
 	
 	public void printAgentsOnMergeList() {
 		scheduleStep(new IComponentStep<Void>() {
@@ -334,96 +347,133 @@ public class WorkspaceAgent extends MicroAgent {
 			}
 		}).get();
 	}
-		
-
-		
-
-		
-	public void manageMergeList() {
-		System.out.println(getAgentName() + " - Zaczynam przegladac liste agentow chetnych do polaczenia ");
-		while (mergeList.size() >= 2) {
-			mergeAgents(mergeList.get(0), mergeList.get(1));
-			mergeList.remove(0);
-			mergeList.remove(0);
-		}
-	}
 
 	
-	@AgentKilled
-	public IFuture<Void> agentKilled() {
-		System.out.println(getAgentName() + " killed.");
-		return IFuture.DONE;
-	}
-	
-//	private void doSomethingOnAllChildren() {
-//		for (final IComponentIdentifier child : childrenAgents) {
-//			
-//			if (verbose) {
-//				//action.doAction();
-//				System.out.println(getAgentName() + " - performing step on " + child.getLocalName());
-//			}
-//			
-//			
-//			IFuture<ICustomAgentService> f = SServiceProvider.getService(getServiceProvider(), child, ICustomAgentService.class);
-//			f.addResultListener(new DefaultResultListener<ICustomAgentService>() {
-//				@Override
-//				public void resultAvailable(ICustomAgentService arg0) {
-//					IFuture<Void> fut = arg0.doSomething(action);
-//					
-//					fut.addResultListener(new DefaultResultListener<Void>() {
-//						@Override
-//						public void resultAvailable(Void arg0) {
-//							
-//						}
-//					});
-//					
-//					
-//					IFuture<Double> f = arg0.getState();
-//					
-//					System.out.println(getAgentName() + " -" + child.getLocalName() + " state: " + f.get());
-//					
-//					arg0.getState().addResultListener(new DefaultResultListener<Double>() {
-//
-//						@Override
-//						public void resultAvailable(Double arg0) {
-//							System.out.println(getAgentName() + " -" + child.getLocalName() + " state: " + arg0);
-//							
-//						}
-//					});
-//				}
-//			});		
+	/***********************************************************************************************
+	 **************************************** MANAGE AGENTS **************************************** 
+	 ***********************************************************************************************/
+	// Funkcja tworzy agenta
+	private void createChildAgent(final double initialState) {
+		scheduleStep(new IComponentStep<Void>() {
+			
+			@Override
+			public IFuture<Void> execute(IInternalAccess ia) {
+				// Wypisanie informacji na konsole o akcji
+				if (verbose) {
+					//System.out.println("WORKPLACEAGENT - Creating Agent: " + getAgentName() + "#CHILD" + lastPeerIndex);	
+					System.out.println(getAgentName() + " - Tworze agenta: " + getAgentName() + "#CHILD" + lastPeerIndex);
+				}
 				
-
-
-
-	
-	public boolean checkIfChildExists(IComponentIdentifier me) {
-		return childrenAgents.contains(me);
+				// Stworzenie informacji przekazywanej nowemu agentowi tj. kim jest jego parent, ustawienie parametrow		
+				CreationInfo crInfo = new CreationInfo(getComponentIdentifier());
+				Map<String, Object> infoArgs = new HashMap<String, Object>();
+				infoArgs.put("verbose", verbose);
+				infoArgs.put("id", new Integer(lastPeerIndex));
+				infoArgs.put("state", new Double(initialState));
+				crInfo.setArguments(infoArgs);
+				
+				// Właściwe stworzenie agenta
+				childrenAgents.add(cms.createComponent(getAgentName() + "#CHILD" + lastPeerIndex, CustomAgent.class.getName()+".class", crInfo, null).get());
+				
+				// uaktualniamy wlasny zbior child agentow
+				updateChildrenSet();
+				
+				// Aktualizacja odpowiednich zmiennych
+				lastPeerIndex++;
+				actualChildrenCount++;
+			
+				// Powrót
+				return IFuture.DONE;
+			}
+		}).get();
 	}
+	
+	private void notifyAllChildAgents(final IComponentIdentifier agentToRemove) {
+		scheduleStep(new IComponentStep<Void>() {
 
+			@Override
+			public IFuture<Void> execute(IInternalAccess ia) {
+				for(final IComponentIdentifier cid:  childrenAgents) {
+					SServiceProvider.getService(getServiceProvider(), cid, ICustomAgentService.class).get().removeAgentFromKnownSiblings(agentToRemove).get();
+				}
+				
+				return IFuture.DONE;
+			}
+		}).get();
+	}
+	
 	public void deleteChildAgent(IComponentIdentifier me) {
 		System.out.println("Deleting agent " + me);
 		if (checkIfChildExists(me)) {
 			cms.destroyComponent(me).get();
 			actualChildrenCount--;
 			childrenAgents = getChildrenAgents();
+			notifyAllChildAgents(me);
+			
 		}  else {
 			System.out.println("There is no child agent " + me);
 		}
 	}
 	
-	
-	
-	public void mergeAgents(IComponentIdentifier agent1, IComponentIdentifier agent2) {
-		double stateAgent1 = SServiceProvider.getService(getServiceProvider(), agent1, ICustomAgentService.class).get().getState();
-		double stateAgent2 = SServiceProvider.getService(getServiceProvider(), agent2, ICustomAgentService.class).get().getState();
-		createChildAgent(stateAgent1 + stateAgent2);
-		deleteChildAgent(agent1);
-		deleteChildAgent(agent2);
+	// uaktualnia zbior agentow
+	private void updateChildrenSet() {
+		scheduleStep(new IComponentStep<Void>() {
+
+			@Override
+			public IFuture<Void> execute(IInternalAccess ia) {
+				childrenAgents.clear();	// czyscimy zbior
+				childrenAgents = getChildrenAgents();	// przypisujemy nowa liste
+				return IFuture.DONE;
+			}
+		}).get();
+	}
+		
+	// wyciaga child agentow z funkji jadexowych
+	private HashSet<IComponentIdentifier> getChildrenAgents() {
+		final HashSet<IComponentIdentifier> result = new HashSet<IComponentIdentifier>();
+		scheduleStep(new IComponentStep<Void>() {
+
+			@Override
+			public IFuture<Void> execute(IInternalAccess ia) {
+				
+				for (IServiceProvider sp : getServiceContainer().getChildren().get()) {
+					result.add(sp.getId());
+				}		
+				return IFuture.DONE;
+			}
+		}).get();
+
+		return result;
 	}
 	
-	public void addToMergeList(final IComponentIdentifier cid) {
-		if (!mergeList.contains(cid))
-			mergeList.add(cid);	
+	
+	// losuje sposrow wszystkich child agentow jednego
+	public IComponentIdentifier getSomeChildAgent() {
+		Random r = new Random((new Date()).getTime());
+		
+		Integer rNumber = r.nextInt(childrenAgents.size());
+		
+		Iterator<IComponentIdentifier> itr = childrenAgents.iterator();
+		for (int i = 0; i < rNumber; i++, itr.next())
+			;
+		
+		return itr.next();
+	}
+	
+	public boolean checkIfChildExists(IComponentIdentifier me) {
+		return childrenAgents.contains(me);
+	}
+	
+	public boolean checkIfChildAgentsExists(ArrayList<IComponentIdentifier> agentsList) {
+		boolean result = true;
+		
+		for (IComponentIdentifier agent : agentsList) {
+			if (!checkIfChildExists(agent)) {
+				System.out.println(getAgentName() + " - child agent " + agent.getName() + " does not exist.");
+				result = false;
+			}
+		}
+		
+		return result;
 	}
 }
