@@ -6,7 +6,7 @@ import jadex.commons.future.Future;
 public interface ICustomAgentService {
 
 	/** serwis wywoluje akcje przeslana jako parametr */
-	public Future<Void> doSomething(final IAction action);
+	public Future<Void> step(final IAction action);
 
 	/** serwis zwraca stan agenta */
 	public Future<Double> getState();
@@ -15,6 +15,5 @@ public interface ICustomAgentService {
 
 	public Future<Void> modifyStateBy(Double chunk);
 
-	public Future<Void> removeAgentFromKnownSiblings(
-			IComponentIdentifier agentToRemove);
+	public Future<Void> removeAgentFromKnownSiblings(IComponentIdentifier agentToRemove);
 }
