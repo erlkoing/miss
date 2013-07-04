@@ -1,5 +1,5 @@
 package pl.edu.agh.miss;
 
 public interface IAction {
-	public void doAction(CustomAgent agent);
+	public void performAction(CustomAgent agent);
 }
