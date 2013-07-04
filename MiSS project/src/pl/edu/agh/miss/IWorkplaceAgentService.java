@@ -5,16 +5,20 @@ import jadex.bridge.IComponentIdentifier;
 import java.util.List;
 
 public interface IWorkplaceAgentService {
-	public void deleteMe(IComponentIdentifier me);
 
-	public IComponentIdentifier getSomeSibling(IComponentIdentifier me);
+	public IComponentIdentifier getSomeSibling(IComponentIdentifier cid);
 
-	public void signUpForMerge(IComponentIdentifier me);
+	public IComponentIdentifier getSomeSiblingsWithout(List<IComponentIdentifier> myKnownSiblings, IComponentIdentifier cid);
+	
+	public List<IComponentIdentifier> getAllSiblings(IComponentIdentifier cid);
+	
+	public List<IComponentIdentifier> getAllSiblingsWithout(List<IComponentIdentifier> myKnownSiblings, IComponentIdentifier cid);
+	
+	public int getSiblingsCount();
+	
+	public void signUpForMerge(IComponentIdentifier cid);
 
-	public void killMe(IComponentIdentifier me);
-
-	public void signUpForCompare(IComponentIdentifier agent1,
-			IComponentIdentifier agent2);
+	public void signUpForCompare(IComponentIdentifier agent1, IComponentIdentifier agent2);
 
 	public List<IComponentIdentifier> getAgentsToCommunicate();
 }

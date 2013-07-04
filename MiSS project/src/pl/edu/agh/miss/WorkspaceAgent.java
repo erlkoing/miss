@@ -6,7 +6,6 @@ import jadex.bridge.IInternalAccess;
 import jadex.bridge.fipa.SFipa;
 import jadex.bridge.service.IServiceProvider;
 import jadex.bridge.service.search.SServiceProvider;
-import jadex.bridge.service.types.clock.IClockService;
 import jadex.bridge.service.types.cms.CreationInfo;
 import jadex.bridge.service.types.cms.IComponentManagementService;
 import jadex.bridge.service.types.message.MessageType;
@@ -45,7 +44,6 @@ import com.thoughtworks.xstream.XStream;
 
 @RequiredServices({
 		@RequiredService(name = "cms", type = IComponentManagementService.class, binding = @Binding(scope = Binding.SCOPE_PLATFORM)),
-		@RequiredService(name = "clockservice", type = IClockService.class, binding = @Binding(scope = Binding.SCOPE_PLATFORM)),
 		@RequiredService(name = "customservices", type = ICustomAgentService.class, multiple = true, binding = @Binding(dynamic = true, scope = Binding.SCOPE_COMPONENT)) })
 @ProvidedServices(@ProvidedService(type = IWorkplaceAgentService.class, implementation = @Implementation(WorkspaceAgentService.class)))
 @Arguments({
@@ -110,7 +108,7 @@ public class WorkspaceAgent extends MicroAgent {
 
 	HashSet<IComponentIdentifier> childrenAgents = new HashSet<IComponentIdentifier>(); // zbior
 																						// agentow
-
+	
 	List<IComponentIdentifier> agentsToCommunicate = new ArrayList<IComponentIdentifier>();
 
 	ArrayList<IComponentIdentifier> mergeList = new ArrayList<IComponentIdentifier>(); // lista
@@ -119,9 +117,6 @@ public class WorkspaceAgent extends MicroAgent {
 
 	@AgentService
 	protected IComponentManagementService cms;
-
-	@AgentService
-	protected IClockService clockservice;
 
 	// Public methods
 	@Override
@@ -132,13 +127,11 @@ public class WorkspaceAgent extends MicroAgent {
 			@Override
 			public IFuture<Void> execute(IInternalAccess ia) {
 				startTime = System.currentTimeMillis();
+				PlatformRegistry.getInstance().register(getComponentIdentifier());
+				
 				indroduceYourself();
 				createInitialPopulation();
-
-				for (IComponentIdentifier childAgent : childrenAgents) {
-					agentsToCommunicate.add(childAgent);
-				}
-
+			
 				sendAgentsToCommunicate();
 
 				return IFuture.DONE;
@@ -155,14 +148,12 @@ public class WorkspaceAgent extends MicroAgent {
 	//@formatter:on
 	/** prosta funkcja ktora sie przedstawia */
 	private void indroduceYourself() {
-		PlatformRegistry.getInstance().register(getComponentIdentifier());
-
 		scheduleStep(new IComponentStep<Void>() {
 
 			@Override
 			public IFuture<Void> execute(IInternalAccess ia) {
 				if (verbose) {
-					LOGGER.debug("WORKPLACEAGENT - Hello I'm " + getAgentName());
+					LOGGER.debug("WORKPLACEAGENT - Hello I'm " + getAgentName() + "\n");
 				}
 
 				return IFuture.DONE;
@@ -177,8 +168,7 @@ public class WorkspaceAgent extends MicroAgent {
 			@Override
 			public IFuture<Void> execute(IInternalAccess ia) {
 				if (verbose) {
-					LOGGER.debug("WORKPLACEAGENT - Creating initial population");
-					LOGGER.debug("WORKPLACEAGENT - Tworze poczatkowa populacje agentow");
+					LOGGER.debug("WORKPLACEAGENT - Creating initial population\n");
 				}
 				for (int i = 0; i < initialChildrenAgents; ++i) {
 					createChildAgent(10.0);
@@ -194,7 +184,7 @@ public class WorkspaceAgent extends MicroAgent {
 
 		int reciverIndex = 0;
 
-		LOGGER.debug("Message sending to workplace");
+		LOGGER.debug("Message sending to workplace\n");
 		List<IComponentIdentifier> platformIds = new ArrayList<IComponentIdentifier>(PlatformRegistry.getInstance()
 				.getRegisteredIds());
 		platformIds.remove(getExternalAccess().getComponentIdentifier());
@@ -203,11 +193,11 @@ public class WorkspaceAgent extends MicroAgent {
 		for (IComponentIdentifier reciver : platformIds) {
 			platformRecivers[reciverIndex++] = reciver;
 		}
-		LOGGER.debug("Ids number: " + platformRecivers.length);
+		LOGGER.debug("Ids number: " + platformRecivers.length + "\n");
 		LOGGER.debug("Send from: " + getComponentIdentifier() + " to: "
-				+ (platformRecivers.length == 0 ? "" : platformRecivers[0]));
+				+ (platformRecivers.length == 0 ? "" : platformRecivers[0]) + "\n");
 		Map<String, Object> platformMessage = new HashMap<String, Object>();
-		platformMessage.put(SFipa.CONTENT, new XStream().toXML(agentsToCommunicate));
+		platformMessage.put(SFipa.CONTENT, new XStream().toXML(childrenAgents));
 		platformMessage.put(SFipa.RECEIVERS, platformRecivers);
 		platformMessage.put(SFipa.CONVERSATION_ID, SUtil.createUniqueId(getAgentName()));
 
@@ -227,10 +217,15 @@ public class WorkspaceAgent extends MicroAgent {
 				LOGGER.debug("\n\n\n");
 				for (actualStep = 0; actualStep < maxSteps; actualStep++) {
 					if (verbose) {
-						LOGGER.debug("\n\n" + getAgentName() + " - performing step " + actualStep);
+						LOGGER.debug("\n\n" + getAgentName() + " - performing step " + actualStep + "\n");
 					}
-
+					
 					performStepOnAllAgents();
+					
+					agentsToCommunicate.clear();
+					sendAgentsToCommunicate();
+					agentsToCommunicate.addAll(childrenAgents);
+					
 				}
 				return IFuture.DONE;
 			}
@@ -262,9 +257,9 @@ public class WorkspaceAgent extends MicroAgent {
 
 			@Override
 			public IFuture<Void> execute(IInternalAccess ia) {
-				LOGGER.debug("\n" + cid.getLocalName());
+				LOGGER.debug("\n" + cid.getLocalName() + "\n");
 				SServiceProvider.getService(getServiceProvider(), cid, ICustomAgentService.class).get()
-						.doSomething(action).get();
+						.step(action).get();
 				printAllAgentsStates();
 				return IFuture.DONE;
 			}
@@ -274,7 +269,7 @@ public class WorkspaceAgent extends MicroAgent {
 	@Override
 	@AgentKilled
 	public IFuture<Void> agentKilled() {
-		LOGGER.debug(getAgentName() + " killed.");
+		LOGGER.debug(getAgentName() + " killed.\n");
 
 		long endTime = System.currentTimeMillis();
 		System.out.println("Execution time: " + (endTime - startTime) / (double) 1000 + " sek.");
@@ -289,7 +284,7 @@ public class WorkspaceAgent extends MicroAgent {
 	// @formatter:on
 	/** Porownywanie stanow agentow */
 	private void compareAgents(IComponentIdentifier agent1, IComponentIdentifier agent2) {
-		LOGGER.debug(getAgentName() + " - comparing " + agent1.getLocalName() + " with " + agent2.getName());
+		LOGGER.debug(getAgentName() + " - comparing " + agent1.getLocalName() + " with " + agent2.getName() + "\n");
 
 		ArrayList<IComponentIdentifier> agentsList = new ArrayList<IComponentIdentifier>();
 		agentsList.add(agent1);
@@ -306,7 +301,7 @@ public class WorkspaceAgent extends MicroAgent {
 			Double compareResult = (agentState1 - agentState2) * compareParameter;
 
 			LOGGER.debug(getAgentName() + " - comparing agent " + agent1.getName() + " " + agentState1 + ", with "
-					+ agent2.getName() + " " + agentState2 + " - " + compareResult);
+					+ agent2.getName() + " " + agentState2 + " - " + compareResult + "\n");
 
 			SServiceProvider.getService(getServiceProvider(), agent1, ICustomAgentService.class).get()
 					.modifyStateBy(compareResult).get();
@@ -316,16 +311,14 @@ public class WorkspaceAgent extends MicroAgent {
 	}
 
 	public void manageComparations() {
-		LOGGER.debug("ManageComparation");
+		LOGGER.debug("ManageComparation\n");
 		// uaktualniamy zbior naszych child agentow
 		updateChildrenSet();
-		LOGGER.debug("iteracja");
-		LOGGER.debug(compareList.size());
 		for (ArrayList<IComponentIdentifier> agentsToCompare : compareList) {
 			if (agentsToCompare.size() == 2) {
 				compareAgents(agentsToCompare.get(0), agentsToCompare.get(1));
 			} else {
-				LOGGER.debug(getAgentName() + " - invalid array list size with agents to compare.");
+				LOGGER.debug(getAgentName() + " - invalid array list size with agents to compare.\n");
 			}
 		}
 
@@ -337,13 +330,11 @@ public class WorkspaceAgent extends MicroAgent {
 
 			@Override
 			public IFuture<Void> execute(IInternalAccess ia) {
-				LOGGER.debug("dodaje agentow do listy w celu porownania");
-				LOGGER.debug(compareList.size());
+				LOGGER.debug("dodaje agentow do listy w celu porownania\n");
 				ArrayList<IComponentIdentifier> agentsList = new ArrayList<IComponentIdentifier>();
 				agentsList.add(agent1);
 				agentsList.add(agent2);
 				compareList.add(agentsList);
-				LOGGER.debug(compareList.size());
 				return IFuture.DONE;
 			}
 		}).get();
@@ -356,7 +347,7 @@ public class WorkspaceAgent extends MicroAgent {
 	//@formatter:off
 	public void manageMergeList() {
 		LOGGER.debug(getAgentName()
-						+ " - Zaczynam przegladac liste agentow chetnych do polaczenia ");
+						+ " - Zaczynam przegladac liste agentow chetnych do polaczenia\n");
 		while (mergeList.size() >= 2) {
 			mergeAgents(mergeList.get(0), mergeList.get(1));
 			mergeList.remove(0);
@@ -398,7 +389,7 @@ public class WorkspaceAgent extends MicroAgent {
 					LOGGER.debug(cid.getName()
 							+ " - "
 							+ SServiceProvider.getService(getServiceProvider(), cid, ICustomAgentService.class).get()
-									.getState().get());
+									.getState().get() + "\n");
 				}
 				return IFuture.DONE;
 			}
@@ -409,11 +400,10 @@ public class WorkspaceAgent extends MicroAgent {
 	@AgentMessageArrived
 	public void messageArrived(Map<String, Object> message, final MessageType messageType) {
 
-		List<IComponentIdentifier> remoteAgents = (List<IComponentIdentifier>) (new XStream().fromXML((String) message
+		HashSet<IComponentIdentifier> remoteAgents = (HashSet<IComponentIdentifier>) (new XStream().fromXML((String) message
 				.get(SFipa.CONTENT)));
 
-		LOGGER.debug(getAgentName() + " - message arrived for workspace, content: ");
-
+		LOGGER.debug(getAgentName() + " - message arrived for workspace, content: \n");
 		agentsToCommunicate.addAll(remoteAgents);
 	}
 
@@ -425,8 +415,8 @@ public class WorkspaceAgent extends MicroAgent {
 			public IFuture<Void> execute(IInternalAccess ia) {
 
 				if (verbose) {
-					LOGGER.debug("WORKPLACES CHILDREN AGENTS");
-					LOGGER.debug(getAgentName() + " - moi agenci " + childrenAgents.size());
+					LOGGER.debug("WORKPLACES CHILDREN AGENTS\n");
+					LOGGER.debug(getAgentName() + " - moi agenci " + childrenAgents.size() + "\n");
 				}
 
 				return IFuture.DONE;
@@ -440,11 +430,11 @@ public class WorkspaceAgent extends MicroAgent {
 			@Override
 			public IFuture<Void> execute(IInternalAccess ia) {
 				if (verbose) {
-					LOGGER.debug(getAgentName() + " - merge list " + mergeList.size());
+					LOGGER.debug(getAgentName() + " - merge list " + mergeList.size() + "\n");
 				}
 
 				for (IComponentIdentifier a : mergeList) {
-					LOGGER.debug(a.getName());
+					LOGGER.debug(a.getName() + "\n");
 				}
 
 				return IFuture.DONE;
@@ -466,8 +456,7 @@ public class WorkspaceAgent extends MicroAgent {
 			public IFuture<Void> execute(IInternalAccess ia) {
 				// Wypisanie informacji na konsole o akcji
 				if (verbose) {
-					LOGGER.debug("WORKPLACEAGENT - Creating Agent: " + getAgentName() + "#CHILD" + lastPeerIndex);
-					LOGGER.debug(getAgentName() + " - Tworze agenta: " + getAgentName() + "#CHILD" + lastPeerIndex);
+					LOGGER.debug("WORKPLACEAGENT - Creating Agent: " + getAgentName() + "#CHILD" + lastPeerIndex + "\n");
 				}
 
 				// Stworzenie informacji przekazywanej nowemu agentowi tj. kim
@@ -485,7 +474,7 @@ public class WorkspaceAgent extends MicroAgent {
 
 				// uaktualniamy wlasny zbior child agentow
 				updateChildrenSet();
-
+				
 				// Aktualizacja odpowiednich zmiennych
 				lastPeerIndex++;
 				actualChildrenCount++;
@@ -511,16 +500,18 @@ public class WorkspaceAgent extends MicroAgent {
 		}).get();
 	}
 
-	public void deleteChildAgent(IComponentIdentifier me) {
-		LOGGER.debug("Deleting agent " + me);
-		if (checkIfChildExists(me)) {
-			cms.destroyComponent(me).get();
+	public void deleteChildAgent(IComponentIdentifier cid) {
+		LOGGER.debug("Deleting agent " + cid + "\n");
+		if (checkIfChildExists(cid)) {
+			if (agentsToCommunicate.contains(cid)) {
+				agentsToCommunicate.remove(cid);
+			}
+			cms.destroyComponent(cid).get();
 			actualChildrenCount--;
 			childrenAgents = getChildrenAgents();
-			notifyAllChildAgents(me);
-
+			notifyAllChildAgents(cid);
 		} else {
-			LOGGER.debug("There is no child agent " + me);
+			LOGGER.debug("There is no child agent " + cid + "\n");
 		}
 	}
 
@@ -532,6 +523,11 @@ public class WorkspaceAgent extends MicroAgent {
 			public IFuture<Void> execute(IInternalAccess ia) {
 				childrenAgents.clear(); // czyscimy zbior
 				childrenAgents = getChildrenAgents(); // przypisujemy nowa liste
+				for (IComponentIdentifier cid : childrenAgents) {
+					if (!agentsToCommunicate.contains(cid)) {
+						agentsToCommunicate.add(cid);
+					}
+				}
 				return IFuture.DONE;
 			}
 		}).get();
@@ -553,6 +549,16 @@ public class WorkspaceAgent extends MicroAgent {
 		}).get();
 
 		return result;
+	}
+	
+	public List<IComponentIdentifier> getChildAgentsList() {
+		List<IComponentIdentifier> childAgentsList = new ArrayList<IComponentIdentifier>();
+		
+		for (IComponentIdentifier cid : childrenAgents) {
+			childAgentsList.add(cid);
+		}
+		
+		return childAgentsList;
 	}
 
 	/** losuje sposrow wszystkich child agentow jednego */
@@ -578,12 +584,16 @@ public class WorkspaceAgent extends MicroAgent {
 
 		for (IComponentIdentifier agent : agentsList) {
 			if (!checkIfChildExists(agent)) {
-				LOGGER.debug(getAgentName() + " - child agent " + agent.getName() + " does not exist.");
+				LOGGER.debug(getAgentName() + " - child agent " + agent.getName() + " does not exist.\n");
 				result = false;
 			}
 		}
 
 		return result;
+	}
+	
+	public int getChildrenCount() {
+		return childrenAgents.size();
 	}
 
 	public List<IComponentIdentifier> getAgentsToCommunicate() {

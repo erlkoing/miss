@@ -14,42 +14,77 @@ public class WorkspaceAgentService implements IWorkplaceAgentService {
 	private Logger LOGGER = Logger.getLogger(getClass());
 
 	@ServiceComponent
-	WorkspaceAgent agent;
+	WorkspaceAgent workspace;
 
 	@Override
-	public void deleteMe(IComponentIdentifier me) {
-		agent.deleteChildAgent(me);
+	public IComponentIdentifier getSomeSibling(IComponentIdentifier cid) {
+		if (workspace.getChildrenCount() == 1)
+			return null;
+		
+		IComponentIdentifier someSibling;
+		
+		while ((someSibling = workspace.getSomeChildAgent()).getLocalName().equals(cid.getLocalName())) 
+			;
+
+		return someSibling;
+	}
+	
+	@Override
+	public IComponentIdentifier getSomeSiblingsWithout(List<IComponentIdentifier> myKnownSiblings, IComponentIdentifier cid) {
+		myKnownSiblings.add(cid);
+		if (myKnownSiblings.size() == workspace.getChildrenCount())
+			return null;
+		
+		IComponentIdentifier someSibling;
+		
+		do {
+			someSibling = workspace.getSomeChildAgent();
+		} while(myKnownSiblings.contains(someSibling));
+		
+		return someSibling;
+	}
+	
+	@Override
+	public List<IComponentIdentifier> getAllSiblings(IComponentIdentifier cid) {
+		if (workspace.getChildrenCount() == 1)
+			return null;
+		
+		List<IComponentIdentifier> allSiblingsList = workspace.getChildAgentsList();
+		allSiblingsList.remove(cid);
+		
+		return allSiblingsList;
+	}
+	
+	@Override
+	public List<IComponentIdentifier> getAllSiblingsWithout(List<IComponentIdentifier> myKnownSiblings, IComponentIdentifier cid) {
+		myKnownSiblings.add(cid);
+		if (myKnownSiblings.size() == workspace.getChildrenCount())
+			return null;
+		
+		List<IComponentIdentifier> allSiblingsList = workspace.getChildAgentsList();
+		
+		allSiblingsList.removeAll(myKnownSiblings);
+		return allSiblingsList;
 	}
 
 	@Override
-	public IComponentIdentifier getSomeSibling(IComponentIdentifier me) {
-		IComponentIdentifier result;
-		while ((result = agent.getSomeChildAgent()).getLocalName().equals(me.getLocalName())) {
-
-		}
-
-		return result;
+	public int getSiblingsCount() {
+		return workspace.getChildrenCount() - 1;
 	}
 
 	@Override
-	public void signUpForMerge(IComponentIdentifier me) {
-		agent.addToMergeList(me);
-	}
-
-	@Override
-	public void killMe(IComponentIdentifier me) {
-		agent.deleteChildAgent(me);
+	public void signUpForMerge(IComponentIdentifier cid) {
+		workspace.addToMergeList(cid);
 	}
 
 	@Override
 	public void signUpForCompare(IComponentIdentifier agent1, IComponentIdentifier agent2) {
-		LOGGER.debug("zapisuje agentow " + agent1.getName() + " i " + agent2.getName());
-		agent.addToCompareList(agent1, agent2);
+		LOGGER.debug("zapisuje agentow " + agent1.getName() + " i " + agent2.getName() + "\n");
+		workspace.addToCompareList(agent1, agent2);
 	}
 
 	@Override
 	public List<IComponentIdentifier> getAgentsToCommunicate() {
-		return agent.getAgentsToCommunicate();
+		return workspace.getAgentsToCommunicate();
 	}
-
 }
