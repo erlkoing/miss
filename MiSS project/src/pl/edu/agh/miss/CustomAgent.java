@@ -4,8 +4,8 @@ import jadex.bridge.IComponentIdentifier;
 import jadex.bridge.IComponentStep;
 import jadex.bridge.IInternalAccess;
 import jadex.bridge.fipa.SFipa;
-import jadex.bridge.service.types.clock.IClockService;
 import jadex.bridge.service.types.message.MessageType;
+import jadex.commons.SUtil;
 import jadex.commons.future.Future;
 import jadex.commons.future.IFuture;
 import jadex.micro.MicroAgent;
@@ -23,13 +23,14 @@ import jadex.micro.annotation.ProvidedServices;
 import jadex.micro.annotation.RequiredService;
 import jadex.micro.annotation.RequiredServices;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
 
 @RequiredServices({
-		@RequiredService(name = "clockservice", type = IClockService.class, binding = @Binding(scope = Binding.SCOPE_PLATFORM)),
 		@RequiredService(name = "workplaceservice", type = IWorkplaceAgentService.class, binding = @Binding(scope = Binding.SCOPE_PLATFORM)) })
 @ProvidedServices(@ProvidedService(type = ICustomAgentService.class, implementation = @Implementation(CustomAgentService.class)))
 @Arguments({
@@ -131,8 +132,30 @@ public class CustomAgent extends MicroAgent {
 
 	@Override
 	@AgentMessageArrived
-	public void messageArrived(Map<String, Object> message, final MessageType messageType) {
+	public void messageArrived(final Map<String, Object> message, final MessageType messageType) {
 		LOGGER.debug(getAgentName() + " - Message arrived, content: ");
-		LOGGER.debug(message.get(SFipa.CONTENT));
+		LOGGER.debug(message.get(SFipa.CONTENT) + "\n");
 	}
+	
+	public void sendMessageToOthers() {	
+		List<IComponentIdentifier> agentsToCommunicate = workplaceservice.getAgentsToCommunicate();
+	
+		IComponentIdentifier[] recivers = new IComponentIdentifier[agentsToCommunicate.size()-1];
+	
+		IComponentIdentifier thisAgentId = getComponentIdentifier();
+		int reciverId = 0;
+		for (IComponentIdentifier agentId : agentsToCommunicate) {
+			if (agentId != thisAgentId) {
+				recivers[reciverId++] = agentId;
+			}
+		}
+	
+		LOGGER.debug(getAgentName() + " sending message to " + agentsToCommunicate.size() +" agents\n");
+		Map<String, Object> message = new HashMap<String, Object>();
+		message.put(SFipa.CONTENT, "Hello, here agent " + getAgentName() + "!");
+		message.put(SFipa.RECEIVERS, recivers);
+		message.put(SFipa.CONVERSATION_ID, SUtil.createUniqueId(getAgentName()));
+		sendMessage(message, SFipa.FIPA_MESSAGE_TYPE);
+	}
+
 }
